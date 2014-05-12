@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+var Twit = require('twit');
+var https = require('https');
+var im = require('gm').subClass({ imageMagick: true });
+
+var config = require(__dirname + '/config.json');
+
+var twit = new Twit(config.twitter);
+
+twit.get('users/show', { screen_name: config.mirror }, function(err, user) {
+	var profileImage = user.profile_image_url_https.replace('_normal', '');
+	var basename = profileImage.replace(/.*\/([^\/]+)$/, '$1');
+
+	https.get(profileImage, function(res) {
+		var image = new Buffer(0);
+
+		res.on('data', function(d) {
+			image = Buffer.concat([image, d]);
+		});
+
+		res.on('end', function() {
+			im(image, basename)
+			.flip()
+			.toBuffer(function(err, image) {
+				if (err)
+					return;
+
+				twit.post(
+					'account/update_profile_image',
+					{ image: image.toString('base64') },
+
+					function(err) {
+						if (!err)
+							console.log('done');
+					}
+				);
+			});
+		});
+	});
+});
+
+// vim: set ft=javascript :
